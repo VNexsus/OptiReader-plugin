@@ -1,6 +1,6 @@
 ## Плагин для распознавания текста и вставки текста в документы для Р7-Офис
 
-<img alt="Preview" width="800px" src="https://github.com/VNexsus/OptiReader-plugin/blob/main/preview.png">
+<img alt="Preview" width="600px" src="https://github.com/VNexsus/OptiReader-plugin/blob/main/preview.png">
 
 ## Функциональные возможности:
 Распознавание текста из различных источников, с возможностью:
