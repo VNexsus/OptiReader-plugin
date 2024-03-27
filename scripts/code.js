@@ -392,10 +392,14 @@
 							window.AscDesktopEditor.loadLocalFile(_file[0], window.fileSelected);
 						else{
 							// ALL files are selected
+							var count = 0;
 							for(var i = 0; i < _file.length; i++)
-								window.AscDesktopEditor.loadLocalFile(_file[i], window.fileSelected);
+								if('png,gif,jpg,jpeg'.indexOf(_file[i].substring(_file[i].lastIndexOf(".")+1).toLowerCase()) != -1) {
+									window.AscDesktopEditor.loadLocalFile(_file[i], window.fileSelected);
+									count++;
+								}
 							pageNum = null;
-							pageCount = _file.length;
+							pageCount = count;
 						}
 					}
 				}
