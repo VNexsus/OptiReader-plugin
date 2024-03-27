@@ -1,0 +1,297 @@
+<!--
+ (c) Copyright VNexus 2024
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>OCR 2.0</title>
+	<script type="text/javascript" src="resources/js/plugins.js"></script>
+    <script type="text/javascript" src="resources/js/plugins-ui.js"></script>
+	<script src="vendor/jquery/jquery-3.7.1.min.js"></script>
+	<script src="scripts/code.js"></script>
+	<script src="vendor/pdf.js/pdf.mjs" type="module"></script>
+	<script type='text/javascript' src='vendor/tesseract/tesseract.min.js'></script>
+    <link rel="stylesheet" href="resources/css/plugins.css">
+    <link rel="stylesheet" href="resources/css/app.css">
+	<style>
+		html, body {
+			min-height: 100% !important;
+			height: 100%;
+			overflow-y:hidden;
+            overflow-x: hidden;
+			padding: 0!important;
+			background-color: var(--background-normal)!important;
+		}
+		
+		.btn {
+			padding: 1px 10px;
+		}
+		
+		#pageframe {
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+		}
+		
+		#toolbar {
+			display: flex;
+			flex-direction: row;
+			flex: 1;
+			padding: 10px;
+			background-color: var(--background-toolbar);
+			border-bottom: 1px solid var(--border-toolbar);
+		}
+		
+		#file-tools,
+		#pdf-tools,
+		#ocr-tools,
+		#ocr-status {
+			flex-basis: 50%;
+			text-align: center;
+			display: flex;
+			justify-content: space-evenly;
+			animation: intro .3s both;
+		}
+		
+		#file-tools > div,
+		#page-tools,
+		#page-tools > div {
+			display: inline-block;
+		}
+
+		#page-counter {
+			display: inline-block;
+			padding: 0 10px;
+		}
+		
+		#ocr-tools > div {
+			display: inline-block;
+			padding: 0 5px;
+		}
+		
+		#workarea {
+			display: flex;
+			flex-direction: row;
+			flex: 100;
+			overflow: auto;
+			margin: 5px;
+		}
+		
+		#preview-container,
+		#ocr-container {
+			flex-basis: 50%;
+			display: block;
+			margin: 0 5px 5px 5px;
+			overflow: auto;
+			padding: 5px 10px 5px 5px;
+		}
+
+		#preview-container {
+			text-align: center;
+		}
+		
+		#pdf-preview {
+			width: 100%!important;
+			height: auto!important;
+		}
+		
+		#pdf-preview {
+			animation: intro .3s both;
+			border: none!important;
+			box-shadow: 1px 1px 5px 3px rgb(127 127 127 / 30%);
+			display: none;
+		}
+		
+		#upload-container {
+			position: absolute;
+			top: 0;
+			left: 0;
+			display: table;
+			vertical-align: middle;
+			text-align: center;
+			width: 100%;
+			height: 100%;
+			z-index: 100;
+			background: var(--background-normal);
+			padding: 15px 20px;
+			cursor: pointer;
+		}
+		.upload {
+			color: var(--text-link);
+			font-size: 200%;
+			display: table-cell;
+			vertical-align: middle;
+			background: var(--backgroud-normal);
+			margin: 10%;
+			border: 1px dashed var(--border-regular-control);
+			border-radius: 10px;
+			padding: 40px;
+		}
+		
+		.upload-icon {
+			background-image: url(./resources/img/folder.svg);
+			width: 110px;
+			height: 110px;
+			display: block;
+			border: none;
+			background-repeat: no-repeat;
+			background-position: center;
+			margin: 0 auto 30px auto;
+		}
+		
+		#progress {
+			width: 100px;
+			display: inline-block;
+		}
+		.progress{
+			text-align: center;
+			position: relative;
+			border: 1px solid var(--border-preview-hover);
+			border-radius: 3px;
+		}
+		.progressvalue{
+			position: relative;
+			display: inline-block;
+			z-index: 1;
+			margin-top: 1px;
+		}
+		.progressbar-container {
+			position: absolute;
+			width: 100%;
+			left: 0;
+			top: 0;
+			height: 100%;
+			padding: 1px;	
+		}
+		.progressbar{
+			left: 0;
+			top: 0;
+			height: 100%;
+			width: 0;
+			max-width: 100%;
+			background: rgba(43, 226, 133, .7);
+			border-radius: 2px;
+			transition: all .3s;
+		}
+		
+		.text-stub {
+			display: table;
+			width: 100%;
+			height: 100%;
+			border: 1px dashed var(--border-divider);
+			border-radius: 5px;
+		}
+		
+		.text-stub > div {
+			display: table-cell;
+			height: 100%;
+			text-align: center;
+			vertical-align: middle;
+			font-size: 200%;
+			color: var(--border-regular-control);
+			padding: 15px;
+		}
+		
+		#text-preview {
+			height: 100%;
+		}
+		
+		#text-preview .page-break {
+			height: 1px;
+			background: var(--border-regular-control);
+			margin: 20px 0;
+			color: var(--border-regular-control);
+		}
+		
+		#text-preview .page-break:after {
+			content: 'следующая страница';
+			position: relative;
+			top: -8px;
+			text-align: center;
+			background: var(--background-normal);
+			margin: 0 0 0 5px;
+			padding: 0 5px 0 5px;
+		}
+		
+		@keyframes intro {
+			0% {
+				opacity: 0;
+			}
+			100% {
+				opacity: 1;
+			}
+		}
+		
+	</style>
+</head>
+<body style="width: 100%;height: 100%; padding: 5px;">
+	<div id="pageframe">
+		<div id="toolbar">
+			<div id="file-tools">
+				<div>
+					<input style="display: none" type="file" id="uploadfile" multiple accept='image/jpeg,image/png,application/pdf'/>
+					<button id="selectfile" class="form-control btn">Выбрать файл...</button>
+				</div>
+				<div id="page-tools">
+					<div><button id="prev" disabled class="form-control btn">&#x1F860;</button></div>
+					<div id="page-counter">
+						Лист <span id="page_num"></span> / <span id="page_count"></span>
+					</div>
+					<div><button id="next" disabled class="form-control btn">&#x1F862;</button></div>
+				</div>
+			</div>
+			<div id="ocr-tools">
+				<div>
+					<button id="recognize" disabled class="form-control btn">Распознать лист</button>
+				</div>
+				<div>
+					<button id="recognizeall" disabled class="form-control btn">Распознать все</button>
+				</div>
+				<div>
+					<button id="addtext" disabled class="form-control btn">Добавить в документ</button>
+				</div>
+			</div>
+			<div id="ocr-status" style="display: none">
+				<label class="header" style="margin-right:10px">
+					Распознавание <span id="ocr_num"></span> из <span id="ocr_count"></span>
+				</label>
+				<div id="progress" class="progress">
+					<span class="progressvalue"></span>
+					<div class="progressbar-container"><div class="progressbar"></div></div>
+				</div>				
+			</div>
+		</div>
+		<div id="workarea">
+			<div id="preview-container">
+				<canvas id="pdf-preview" style="border: 1px solid black; direction: ltr;"></canvas>
+			</div>
+			<div id="ocr-container">
+				<div id="text-preview">
+					<div class="text-stub">
+						<div>Здесь появится текст после распознавания</div>
+					</div>
+				</div>
+			</div>
+			<div id="upload-container">
+				<div class="upload">
+					<div><span class="upload-icon"/></div>
+					Выберите документ Adobe Acrobat или набор изображений PNG, JPG, GIF для распознавания
+				<div>
+			<div>
+		</div>
+	</div>
+</body>
+</html>
