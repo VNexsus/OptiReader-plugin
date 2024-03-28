@@ -53,7 +53,7 @@
 		document.getElementById('uploadfile').addEventListener('change', window.fileSelected);
 		
 		// set pdf.js worker path
-		pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.js/pdf.worker.mjs';
+		pdfjsLib.GlobalWorkerOptions.workerSrc = './vendor/pdf.js/pdf.worker.mjs';
 		// enable window resizing
 		window.Asc.plugin.resizeWindow(900, 675, 800, 600, 1200, 1000);
 		$(window.parent.document).find(".asc-window.modal").find(".header").on('dblclick', window.toggleSize);
