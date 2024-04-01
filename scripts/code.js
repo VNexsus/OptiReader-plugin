@@ -27,15 +27,17 @@
 		pageStart = 1,
 		pageRendering = false,
 		pageNumPending = null,
-		scale = 1.75,
+		scale = 2,
 		canvas = null,
 		ctx = null;
 	
 	var arrImages = [];	
 	var arrParsedData = [];
+	var htmlPreview = [];
 	var nStartFilesCount = 0;
 	var mode = null;
 	var source = null;
+	var cropper = null;
 	
 	window.Asc.plugin.init = function(text) {
 		$(document.body).addClass(window.Asc.plugin.getEditorTheme());
@@ -45,53 +47,59 @@
 		// set buttons actions
 		document.getElementById('prev').addEventListener('click', onPrevPage);
 		document.getElementById('next').addEventListener('click', onNextPage);
+		document.getElementById('crop').addEventListener('click', onPageCrop);
 		document.getElementById('recognize').addEventListener('click', onRecognize);
 		document.getElementById('recognizeall').addEventListener('click', onRecognizeAll);
 		document.getElementById('addtext').addEventListener('click', onAddText);
 		document.getElementById('selectfile').addEventListener('click', window.selectFile);
 		document.getElementById('upload-container').addEventListener('click', window.selectFile);
 		document.getElementById('uploadfile').addEventListener('change', window.fileSelected);
-		
+		document.addEventListener('selectionchange', wordOptions);
 		// set pdf.js worker path
-		pdfjsLib.GlobalWorkerOptions.workerSrc = './vendor/pdf.js/pdf.worker.mjs';
+		pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.js/pdf.worker.min.mjs';
 		// enable window resizing
 		window.Asc.plugin.resizeWindow(900, 675, 800, 600, 1200, 1000);
 		$(window.parent.document).find(".asc-window.modal").find(".header").on('dblclick', window.toggleSize);
+		// create observer for recognized text changes
+		var observer = new MutationObserver(function(e) {
+			e.forEach(function(el){
+				$(el.target.parentNode).removeClass(function(i,c){return (c.match (/wc-\d+/g) || []).join(' ')});
+				$(el.target.parentNode).attr('data-confidence', 100);
+				$('span.options').remove();
+			});
+		});
+		observer.observe(document.querySelector('#text-preview'), { characterData: true, attributes: false, childList: false, subtree: true });
 	};
 
-	window.toggleSize = function (){
-		if(!maximized){
-			initialWidth = window.innerWidth;
-			initialHeight = window.innerHeight;
-			window.Asc.plugin.resizeWindow(parent.window.innerWidth, parent.window.innerHeight, 800, 600, 0, 0);
+	function onPageCrop() {
+		if(cropper){
+			cropper.destroy();
+			cropper=null;
+			$('#recognize span').text('Распознать лист');
+			$('#crop').removeClass('active'), updatePageControls();
 		}
-		else{
-			window.Asc.plugin.resizeWindow(initialWidth, initialHeight, 800, 600, 0, 0);
+		else {
+			// set up cropper
+			cropper = new Cropper(document.getElementById('pdf-preview'), {
+				autoCrop: false,
+				modal: false,
+				viewMode: 1,
+				zoomOnWheel: false,
+				ready() {
+					this.cropper.crop();
+				},
+			});
+			$('#crop').addClass('active');
+			$('#recognize span').text('Распознать выделение');
+			$('#recognizeall').prop('disabled', true);
 		}
-		maximized=!maximized;
 	}
-
-	window.Asc.plugin.button = function(id) {
-		this.executeCommand("close", "");
-	};
-
-	window.Asc.plugin.onThemeChanged = function(theme){
-		window.Asc.plugin.onThemeChangedBase(theme);
-		$(document.body).removeClass("theme-dark theme-light").addClass(window.Asc.plugin.getEditorTheme());
-	}
-
-	window.Asc.plugin.getEditorTheme = function(){
-		if(window.localStorage.getItem("ui-theme-id")){
-			var match = window.localStorage.getItem("ui-theme-id").match(/\S+\-(\S+)/);
-			if(match.length==2)
-				return "theme-" + match[1];
-		}
-		return "theme-light";
-	}
-
 
 	function renderPage(num) {
 		pageRendering = true;
+		if(cropper)
+			//cropper.destroy(), cropper=null, $('#crop').removeClass('active');
+			onPageCrop()
 		if(source == 'pdf'){
 			pageNum = num
 			updatePageControls();
@@ -128,6 +136,8 @@
 						renderPage(pageNumPending);
 						pageNumPending = null;
 					}
+					if(cropper)
+						cropper.reset();
 				});
 			});
 
@@ -163,6 +173,8 @@
 		if (pageNum <= 1) {
 			return;
 		}
+		hideHighlighter();
+		removeSelection();
 		queueRenderPage(pageNum-1);
 	}
 
@@ -170,14 +182,36 @@
 		if (pageNum >= pageCount) {
 			return;
 		}
+		hideHighlighter();
+		removeSelection();
 		queueRenderPage(pageNum+1);
 	}
   
 	function onRecognize() {
+		if(htmlPreview.length > 0){
+			parent.Common.UI.confirm({
+				title: "Предупреждение о несохраненных данных",
+				msg: "Данные предыдущего распознавания не сохранены.\n Вы действительно хотите продолжить?",
+				buttons: [
+					{ caption: "Да", value: "yes" },
+					{ caption: "Нет", value: "no", primary: true }
+				],
+				callback: function(value){
+					if(value == 'yes') {
+						htmlPreview = [];
+						onRecognize();
+					}
+				}
+			});
+			return;
+		}
 		mode = 'single';
 		pageStart = pageNum;
 		arrParsedData.length = 0;
-		insertStub();
+		htmlPreview = [];
+		hideHighlighter();
+		removeSelection();
+		insertStub(true);
 		$("#selectfile").prop('disabled', true);
 		$("#prev").prop('disabled', true);
 		$("#next").prop('disabled', true);
@@ -187,19 +221,41 @@
 		$('#ocr_num').text(1);
 		$('#ocr_count').text(1);
 		setProgress(0);
+		if(cropper)
+			cropper.crop();
 		Recognize();
 	}
 
 	function onRecognizeAll() {
+		if(htmlPreview.length > 0){
+			parent.Common.UI.confirm({
+				title: "Предупреждение о несохраненных данных",
+				msg: "Данные предыдущего распознавания не сохранены.\n Вы действительно хотите продолжить?",
+				buttons: [
+					{ caption: "Да", value: "yes" },
+					{ caption: "Нет", value: "no", primary: true }
+				],
+				callback: function(value){
+					if(value == 'yes') {
+						htmlPreview = [];
+						onRecognizeAll();
+					}
+				}
+			});
+			return;
+		}
 		mode = 'full';
 		pageStart = pageNum;
 		arrParsedData.length = 0;
+		htmlPreview = [];
+		hideHighlighter();
+		removeSelection();
 		if(pageNum != 1) {
 			renderPage(1);
 		}
 		else
 			Recognize();
-		insertStub();
+		insertStub(true);
 		$("#selectfile").prop('disabled', true);
 		$("#prev").prop('disabled', true);
 		$("#next").prop('disabled', true);
@@ -223,6 +279,7 @@
 			let sLang = 'rus+eng';
 			let worker = null;
 			let result = null;
+			
 			Tesseract.createWorker({
 				corePath: './vendor/tesseract/',
 				workerPath: './vendor/tesseract/worker.min.js',
@@ -243,15 +300,25 @@
 				return worker.setParameters({
 					tessedit_pageseg_mode: Tesseract.PSM.AUTO,
 				});
+				// cropper.getData([rounded - true|false])
 			}).then(() => {
-				return worker.recognize(image);
+				let options = {};
+				if(cropper){
+					let rect = cropper.getData(true);
+					options.rectangle = {
+						left: rect.x,
+						top: rect.y,
+						width: rect.width,
+						height: rect.height
+					};
+				}
+				return worker.recognize(image, options);
 			}).then((oResult) => {
 				result = oResult;
-				removeStub();
-				$('#text-preview').append($(generateHTMLByData(result.data))[0]);
+				htmlPreview.push(generateHTML(result.data));
 				// add page break
 				if(mode == 'full' && pageNum < pageCount)
-					$('#text-preview').append($('<div class="page-break"></div>'));
+					htmlPreview.push($('<div class="page-break" contenteditable="false"></div>'));
 				arrParsedData.push(result);
 				if(mode == 'full' && source == 'pdf' && pageNum < pageCount){
 					renderPage(pageNum+1);
@@ -261,6 +328,8 @@
 				}
 				else{
 					mode = 'done';
+					removeStub();
+					$('#text-preview').append($('<div contenteditable="true"/>').append(htmlPreview));
 					if(pageNum != pageStart)
 						renderPage(pageStart);
 					else
@@ -278,96 +347,142 @@
 		_recognize();
 	}
 
-	function generateHTMLByData(oData) {
-		let sResult = "<div>";
-		function commitSpan(sLastSpanText, oLastWord) {
-			if(sLastSpanText.length > 0 && oLastWord) {
-				let sStyle = "";
-				if(oLastWord.font_name && oLastWord.font_name.length > 0) {
-					sStyle += ("font-family:" + oLastWord.font_name + ";");
-				}
-				//if(oLastWord.font_size) {
-				//}
-				
-				sStyle += ("font-size:" + 11 + "pt;");
-				if(oLastWord.is_bold) {
-					sStyle += ("font-weight:bold;");
-				}
-				if(oLastWord.is_italic) {
-					sStyle += ("font-style:italic;");
-				}
-				if(oLastWord.is_smallcaps) {
-					sStyle += ("font-variant:small-caps;");
-				}
-				if(oLastWord.is_underlined) {
-					sStyle += ("text-decoration:underline;");
-				}
-				sResult += "<span lang=\"" + oLastWord.language +"\" style=\"" + sStyle + "\">" + sLastSpanText + "</span>";
-			}
-		}
-		
-		let aBlocks = oData.blocks;
-		for(let nBlock = 0; nBlock < aBlocks.length; ++nBlock) {
-			let oBlock = aBlocks[nBlock]; 
-			let aDataPar = oBlock.paragraphs;
-			for(let nPar = 0; nPar < aDataPar.length; ++nPar) {
-				let oDataPar = aDataPar[nPar];
-				let aLines = oDataPar.lines;
+
+	function generateHTML(data) {
+		let result = $('<div spellcheck="false"/>');
+		let blocks = data.blocks;
+		for(let n = 0; n < blocks.length; n++) {
+			let block = blocks[n]; 
+			let paragraphs = block.paragraphs;
+			for(let p = 0; p < paragraphs.length; p++) {
+				let para = paragraphs[p];
+				let lines = para.lines;
 				let nPixIndent = 0;
+				let paragraph = $('<p/>');
 				
 				let oFirstLine, oFirstWord;
-				oFirstLine = aLines[0];
+				oFirstLine = lines[0];
 				if(oFirstLine) {
 					oFirstWord = oFirstLine.words[0];
 					if(oFirstWord) {
-						nPixIndent = oFirstWord.bbox.x0 - oBlock.bbox.x0;
+						nPixIndent = oFirstWord.bbox.x0 - block.bbox.x0;
+						if(Math.abs(nPixIndent) > 5) {
+							let nIndent = (nPixIndent / 72) * 12.9 + 0.5 >> 0;
+							paragraph.css('text-indent', nIndent + 'mm');
+						}
 					}
-				}
-				if(Math.abs(nPixIndent) > 5) {
-					let nIndent = (nPixIndent / 72) * 25.4 + 0.5 >> 0;
-					sResult += "<p style=\"text-indent:" + nIndent + "mm;\">";
-				}
-				else {
-					sResult += "<p>";
 				}
 				
 				let oLastWord = null;
 				let sLastSpanText = "";
-				for(let nLine = 0; nLine < aLines.length; ++nLine) {
-					let oLine = aLines[nLine];
-					let aWords = oLine.words;
-					for(let nWrd = 0; nWrd < aWords.length; ++nWrd) {
-						let oWord = aWords[nWrd];
-						if(!oLastWord || 
-							oWord.font_name !== oLastWord.font_name ||
-							//Math.abs(oWord.font_size - oLastWord.font_size) > 4 ||
-							oWord.is_bold !== oLastWord.is_bold ||
-							oWord.is_italic !== oLastWord.is_italic ||
-							oWord.is_smallcaps !== oLastWord.is_smallcaps ||
-							oWord.is_underlined !== oLastWord.is_underlined ||
-							oWord.language !== oLastWord.language) {
-							commitSpan(sLastSpanText + " ", oLastWord);
-							sLastSpanText = "";
-						}
-						if(sLastSpanText.length > 0) {
-							sLastSpanText += " ";
-						}
-						if(nLine > 0 && nWrd === 0) {
-							//sLastSpanText += "<br/>";
-						}
-						sLastSpanText += oWord.text;
-						oLastWord = oWord;
+				for(let l = 0; l < lines.length; l++) {
+					let line = lines[l];
+					let words = line.words;
+					for(let w = 0; w < words.length; w++) {
+						let word = words[w];
+						
+						let wordspan = $('<span/>');
+						wordspan.addClass('word');
+						if(word.confidence <= 60)
+							wordspan.addClass('wc-'+ (word.confidence/10>>0)*10);
+						wordspan.attr('data-confidence', Math.round(word.confidence,2));
+						wordspan.css('direction', word.direction == 'LEFT_TO_RIGHT' ? 'ltr' : 'rtl');
+						// TODO: process font size recongized
+						wordspan.css('font-size', '11pt');
+						// TODO: process fonts recognized
+						//if(word.font_name.length > 0)
+						//	wordspan.css('font-family', word.font_name);
+						wordspan.css('font-weight', word.is_bold ? 'bold' : 'normal');
+						wordspan.css('font-style', word.is_italic ? 'italic' : 'normal');
+						wordspan.css('font-variant', word.is_smallcaps ? 'small-caps' : 'normal');
+						wordspan.css('text-decoration', word.is_underlined ? 'underline' : 'none');
+						wordspan.prop('lang', word.language.substring(0,2));
+						wordspan.attr('data-box', JSON.stringify(word.bbox));
+						wordspan.attr('data-page', pageNum);
+						wordspan.text(word.text);
+						wordspan.on('click', showHighlighter);
+						
+						paragraph.append(wordspan);
+						paragraph.append($('<span> </span>'));
 					}
+					paragraph.append($('<br/>'));
 				}
-				
-				commitSpan(sLastSpanText, oLastWord);
-				sResult += "</p>";
+				result.append(paragraph)
 			}
 		}
-		sResult += "</div>";
-		return sResult;
+		
+		return result;
 	}
 	
+	function showHighlighter(e){
+		hideHighlighter();
+		if(e.target && $(e.target) && $(e.target).attr('data-box')) {
+			var c = JSON.parse($(e.target).attr('data-box'));
+			var p = parseInt($(e.target).attr('data-page'));
+			if(c && p && p == pageNum){
+				var ratio = $('#pdf-preview').width() / $('#pdf-preview').attr('width');
+				var highlighter = $('<div class="highlighter"/>');
+				highlighter.css('left', c.x0 * ratio + 5);
+				highlighter.css('top', c.y0 * ratio + 5);
+				highlighter.css('width', (c.x1 - c.x0) * ratio);
+				highlighter.css('height', (c.y1 - c.y0) * ratio);
+				highlighter.css('display', 'block');
+				$('.preview-wrapper').append(highlighter);
+				highlighter[0].scrollIntoView({behavior: 'smooth', block: 'nearest'});
+			}
+			else if (c && p && p !=pageNum)
+				renderPage(p)
+		}
+	}
+	
+	function hideHighlighter() {
+		$('#preview-container').find('.highlighter').remove();
+	}
+	
+	function removeSelection() {
+		$('span.word').removeClass('active');
+		$('span.options').remove();
+	}
+
+	function wordOptions(e) {
+		let grab = document.getSelection();
+		let node = null;
+		if(grab.baseNode){
+			node = grab.baseNode.parentNode;
+		}
+		else if(grab.anchorNode)
+			node = grab.anchorNode.parentElement
+		else
+			return;
+			
+		if(node.nodeName == 'SPAN' && node.className.indexOf('word') != -1) {
+			if(!$(node).hasClass('active')){
+				hideHighlighter();
+				$('span.word').removeClass('active');
+				$('span.options').remove();
+				$(node).addClass('active');
+				showHighlighter({target: node});
+				if($(node).attr('data-confidence') != '' && parseInt($(node).attr('data-confidence')) < 60) {
+					let options = $('<span class="options" title="Принять без изменений (достоверность - '+ parseFloat($(node).attr('data-confidence')) +'%)"/>');
+					options.css('top', node.offsetTop > 23 ? node.offsetTop - 23 : node.offsetTop + $(node).height() + 3);
+					options.css('left', node.offsetLeft + ($(node).width()-20)/2);
+					options.on('click',function(e){ 
+						$(node).removeClass(function(i,c){return (c.match (/wc-\d+/g) || []).join(' ')});
+						$(node).attr('data-confidence', 100);
+						$(this).remove(); 
+					});
+					$('#text-preview').append(options);
+				}
+			}
+		}
+		else {
+			hideHighlighter();
+			$('span.word').removeClass('active');
+			$('span.options').remove();
+		}
+		
+	}
+
 	function onAddText() {
 		window.Asc.plugin.executeMethod("PasteHtml", [$('#text-preview').html()]);
 		window.Asc.plugin.button();
@@ -424,8 +539,11 @@
 							arrImages.push(new Uint8Array(e.target.result));
 							pageCount = arrImages.length;
 							renderPage(1);
+							if(cropper)
+								onPageCrop();
 							$('#upload-container').css('display','none');
-							$('#pdf-preview').css('display','inline-block');
+							$('#pdf-preview').css('display','block');
+							htmlPreview = [];
 						}
 						oFileReader.readAsArrayBuffer(arrFiles[i]);
 					}
@@ -443,8 +561,11 @@
 							updatePageControls();
 							// Initial/first page rendering
 							renderPage(pageNum);
+							if(cropper)
+								onPageCrop();
 							$('#upload-container').css('display','none');
-							$('#pdf-preview').css('display','inline-block');
+							$('#pdf-preview').css('display','block');
+							htmlPreview = [];
 						});
 					}
 					oFileReader.readAsArrayBuffer(arrFiles[0]);
@@ -462,27 +583,40 @@
 					updatePageControls();
 					// Initial/first page rendering
 					renderPage(pageNum);
+					if(cropper)
+						onPageCrop();
 					$('#upload-container').css('display','none');
-					$('#pdf-preview').css('display','inline-block');
+					$('#pdf-preview').css('display','block');
+					htmlPreview = [];
 				});
 			}
 			else {
 				// handle image
 				arrImages.push(data);
 				renderPage(1);
+				if(cropper)
+					onPageCrop();
 				$('#upload-container').css('display','none');
-				$('#pdf-preview').css('display','inline-block');
+				$('#pdf-preview').css('display','block');
+				htmlPreview = [];
 			}
 		}
 	}
 	
 	function updatePageControls() {
+		hideHighlighter();
+		if($('.word.active').length > 0)
+			$('.word.active').click();
 		$('#page_num').text(pageNum);
 		$('#page_count').text(pageCount);
-		if(pageCount >= 1)
+		if(pageCount >= 1){
+			$("#crop").prop('disabled', false);
 			$("#recognize").prop('disabled', false);
-		else
+		}
+		else {
+			$("#crop").prop('disabled', false);
 			$("#recognize").prop('disabled', false);
+		}
 		if(pageCount >= 2)
 			$("#recognizeall").prop('disabled', false);
 		else
@@ -491,15 +625,71 @@
 			$("#prev").prop('disabled', pageNum == 1 ? true : false);
 			$("#next").prop('disabled', pageNum == pageCount ? true : false);
 		}
+		if(cropper)
+			$('#recognizeall').prop('disabled', true);
 	}
 	
-	function insertStub() {
-		$('#text-preview').html('<div class="text-stub"><div>Здесь появится текст после распознавания</div></div>');
+	function insertStub(ocr) {
+		if(!ocr)
+			$('#text-preview').html(`<div class="text-stub"><div>Здесь появится текст после распознавания</div></div>`);
+		else
+			$('#text-preview').html(`<div class="text-stub"><div>
+			<div>
+				<svg id="processing" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+					<ellipse rx="59.219694" ry="58.522991" transform="matrix(1.488521 0 0 1.488524 150.088597 145.27299)" fill="none" stroke-width="8"></ellipse>
+					<g transform="matrix(1.305514 0 0 1.170899-13.059057 1.223754)" paint-order="fill markers stroke">
+						<line x1="-25.429633" y1="-25.081282" x2="25.429633" y2="25.081282" transform="translate(203.994426 198.560149)" fill="none" stroke-width="15" stroke-linecap="round" stroke-miterlimit="6"></line>
+					</g>
+					<g id="process-indicator" transform="translate(150.088601,145.272991)">
+						<path d="M133.27915,89.17794c25.01057,0,45.28565,20.27505,45.28565,45.2856s-20.27507,45.2856-45.28565,45.2856-45.28565-20.27505-45.28565-45.2856" transform="scale(1.488521,1.488524) translate(-133.27915,-134.46354)" fill="none" stroke-width="5"></path>
+					</g>
+				</svg>
+			</div>
+			<div>Подождите, производится распознавание</div></div></div>`);
 	}
 
 	function removeStub() {
-		$('#text-preview .text-stub').remove();
+		$('#text-preview').empty();
 	}
  
- 
+	// service functions
+	
+ 	window.Asc.plugin.button = function(id) {
+		this.executeCommand("close", "");
+	};
+
+	window.Asc.plugin.onThemeChanged = function(theme){
+		window.Asc.plugin.onThemeChangedBase(theme);
+		$(document.body).removeClass("theme-dark theme-light").addClass(window.Asc.plugin.getEditorTheme());
+	}
+
+	window.Asc.plugin.getEditorTheme = function(){
+		if(window.localStorage.getItem("ui-theme-id")){
+			var match = window.localStorage.getItem("ui-theme-id").match(/\S+\-(\S+)/);
+			if(match.length==2)
+				return "theme-" + match[1];
+		}
+		return "theme-light";
+	}
+	
+	window.toggleSize = function (){
+		if(!maximized){
+			initialWidth = window.innerWidth;
+			initialHeight = window.innerHeight;
+			window.Asc.plugin.resizeWindow(parent.window.innerWidth, parent.window.innerHeight, 800, 600, 0, 0);
+		}
+		else{
+			window.Asc.plugin.resizeWindow(initialWidth, initialHeight, 800, 600, 0, 0);
+		}
+		maximized=!maximized;
+	}
+
+	window.onresize = function() {
+		$('.cropper-container').width($('#pdf-preview').width()+'px');
+		$('.cropper-container').height($('#pdf-preview').height()+'px');
+		if($('.word.active').length > 0)
+			$('.word.active')[0].click();
+	}
+
+
 })(window, undefined);

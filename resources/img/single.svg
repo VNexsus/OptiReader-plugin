@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+
+<svg
+   width="800"
+   height="800"
+   viewBox="-3 0 32 32"
+   version="1.1"
+   id="svg215"
+   sodipodi:docname="single.svg"
+   inkscape:version="1.2.2 (732a01da63, 2022-12-09)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:sketch="http://www.bohemiancoding.com/sketch/ns">
+  <sodipodi:namedview
+     id="namedview217"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="0.50875"
+     inkscape:cx="580.83538"
+     inkscape:cy="615.23341"
+     inkscape:window-width="1389"
+     inkscape:window-height="920"
+     inkscape:window-x="636"
+     inkscape:window-y="26"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg215" />
+  <title
+     id="title206">file-document</title>
+  <desc
+     id="desc208">Created with Sketch Beta.</desc>
+  <defs
+     id="defs210" />
+  <g
+     id="Page-1"
+     stroke="none"
+     stroke-width="1"
+     fill="none"
+     fill-rule="evenodd"
+     sketch:type="MSPage"
+     transform="translate(0,0.08)">
+    <g
+       id="Icon-Set"
+       sketch:type="MSLayerGroup"
+       transform="translate(-154,-99)"
+       fill="#000000">
+      <path
+         d="m 174,107 c -1.104,0 -2,-0.896 -2,-2 v -4 l 6,6 z m 4,20 c 0,1.104 -0.896,2 -2,2 h -18 c -1.104,0 -2,-0.896 -2,-2 v -24 c 0,-1.104 0.896,-2 2,-2 h 11.972 c -0.018,2.395 0.028,4 0.028,4 0,2.209 1.791,4 4,4 h 4 z m -6,-28 v 0.028 c -0.128,0 -0.662,-0.049 -2,-0.028 h -12 c -2.209,0 -4,1.791 -4,4 v 24 c 0,2.209 1.791,4 4,4 h 18 c 2.209,0 4,-1.791 4,-4 v -18 -2 z"
+         id="file-document"
+         sketch:type="MSShapeGroup" />
+    </g>
+  </g>
+  <path
+     d="m 13.039312,21.221937 c -1.512805,0 -2.743902,-1.231097 -2.743902,-2.743903 0,-1.512804 1.231097,-2.743901 2.743902,-2.743901 1.512805,0 2.743903,1.231097 2.743903,2.743901 0,1.512806 -1.231098,2.743894 -2.743903,2.743894 z m 8.184146,-2.947863 c -1.619816,-3.258842 -4.75519,-5.283843 -8.184146,-5.283843 -3.4289651,0 -6.5643291,2.025001 -8.1841461,5.283843 l -0.100608,0.20396 0.100608,0.203961 c 1.619817,3.258842 4.755189,5.283843 8.1841461,5.283843 3.428965,0 6.56433,-2.025001 8.184146,-5.283843 l 0.100608,-0.203961 z"
+     fill-rule="evenodd"
+     id="path121"
+     style="display:inline;stroke-width:0.00863" />
+  <metadata
+     id="metadata241">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>file-document</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+</svg>
